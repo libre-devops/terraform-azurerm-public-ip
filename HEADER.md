@@ -18,33 +18,52 @@
   </a>
 </div>
 
-# Terraform Module Template
+# Terraform Azure Public IP
 
-A starting point for Libre DevOps Terraform modules: the standard file layout, examples, tests, and tooling.
+Creates Azure public IPs and public IP prefixes, with secure defaults and in-module prefix allocation.
 
-[![CI](https://github.com/libre-devops/terraform-module-template/actions/workflows/ci.yml/badge.svg)](https://github.com/libre-devops/terraform-module-template/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/libre-devops/terraform-module-template?sort=semver&label=release)](https://github.com/libre-devops/terraform-module-template/releases/latest)
+[![CI](https://github.com/libre-devops/terraform-azurerm-public-ip/actions/workflows/ci.yml/badge.svg)](https://github.com/libre-devops/terraform-azurerm-public-ip/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/libre-devops/terraform-azurerm-public-ip?sort=semver&label=release)](https://github.com/libre-devops/terraform-azurerm-public-ip/releases/latest)
 [![Terraform Registry](https://img.shields.io/badge/registry-libre--devops-7B42BC?logo=terraform&logoColor=white)](https://registry.terraform.io/namespaces/libre-devops)
-[![License](https://img.shields.io/github/license/libre-devops/terraform-module-template)](./LICENSE)
+[![License](https://img.shields.io/github/license/libre-devops/terraform-azurerm-public-ip)](./LICENSE)
 
 ---
+
+## Overview
+
+Public IPs and public IP prefixes from keyed maps (stable `for_each`). The resource group is passed by
+id and parsed. **Secure defaults**: Standard SKU with Static allocation (Basic is retired and Standard
+requires Static). A public IP can allocate from a prefix created in the same module via `prefix_key`,
+or from an external prefix via `public_ip_prefix_id`. Covers the full `azurerm_public_ip` and
+`azurerm_public_ip_prefix` surface (zones, sku_tier, DDoS mode, DNS label, IP tags, idle timeout, ...).
 
 ## Usage
 
 ```hcl
-module "this" {
-  source = "libre-devops/<module>/azurerm"
+module "public_ip" {
+  source  = "libre-devops/public-ip/azurerm"
+  version = "~> 4.0"
 
-  name     = "rg-ldo-uks-dev-01"
-  location = "uksouth"
-  tags     = { environment = "dev" }
+  resource_group_id = module.rg.ids["rg-ldo-uks-prd-001"]
+  location          = "uksouth"
+  tags              = module.tags.tags
+
+  public_ip_prefixes = {
+    "ippre-ldo-uks-prd-001" = { prefix_length = 30, zones = ["1", "2", "3"] }
+  }
+
+  public_ips = {
+    "pip-ldo-uks-prd-001" = { prefix_key = "ippre-ldo-uks-prd-001" } # allocated from the prefix above
+    "pip-ldo-uks-prd-002" = { zones = ["1", "2", "3"] }
+  }
 }
 ```
 
 ## Examples
 
-- [`examples/minimal`](./examples/minimal) - the smallest valid call (required inputs only).
-- [`examples/complete`](./examples/complete) - every supported input exercised.
+- [`examples/minimal`](./examples/minimal) - one Standard static public IP.
+- [`examples/complete`](./examples/complete) - a zone-redundant prefix, an IP allocated from it, and a
+  standalone zonal IP.
 
 ## Developing
 

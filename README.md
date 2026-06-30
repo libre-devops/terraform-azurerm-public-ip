@@ -18,33 +18,52 @@
   </a>
 </div>
 
-# Terraform Module Template
+# Terraform Azure Public IP
 
-A starting point for Libre DevOps Terraform modules: the standard file layout, examples, tests, and tooling.
+Creates Azure public IPs and public IP prefixes, with secure defaults and in-module prefix allocation.
 
-[![CI](https://github.com/libre-devops/terraform-module-template/actions/workflows/ci.yml/badge.svg)](https://github.com/libre-devops/terraform-module-template/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/libre-devops/terraform-module-template?sort=semver&label=release)](https://github.com/libre-devops/terraform-module-template/releases/latest)
+[![CI](https://github.com/libre-devops/terraform-azurerm-public-ip/actions/workflows/ci.yml/badge.svg)](https://github.com/libre-devops/terraform-azurerm-public-ip/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/libre-devops/terraform-azurerm-public-ip?sort=semver&label=release)](https://github.com/libre-devops/terraform-azurerm-public-ip/releases/latest)
 [![Terraform Registry](https://img.shields.io/badge/registry-libre--devops-7B42BC?logo=terraform&logoColor=white)](https://registry.terraform.io/namespaces/libre-devops)
-[![License](https://img.shields.io/github/license/libre-devops/terraform-module-template)](./LICENSE)
+[![License](https://img.shields.io/github/license/libre-devops/terraform-azurerm-public-ip)](./LICENSE)
 
 ---
+
+## Overview
+
+Public IPs and public IP prefixes from keyed maps (stable `for_each`). The resource group is passed by
+id and parsed. **Secure defaults**: Standard SKU with Static allocation (Basic is retired and Standard
+requires Static). A public IP can allocate from a prefix created in the same module via `prefix_key`,
+or from an external prefix via `public_ip_prefix_id`. Covers the full `azurerm_public_ip` and
+`azurerm_public_ip_prefix` surface (zones, sku_tier, DDoS mode, DNS label, IP tags, idle timeout, ...).
 
 ## Usage
 
 ```hcl
-module "this" {
-  source = "libre-devops/<module>/azurerm"
+module "public_ip" {
+  source  = "libre-devops/public-ip/azurerm"
+  version = "~> 4.0"
 
-  name     = "rg-ldo-uks-dev-01"
-  location = "uksouth"
-  tags     = { environment = "dev" }
+  resource_group_id = module.rg.ids["rg-ldo-uks-prd-001"]
+  location          = "uksouth"
+  tags              = module.tags.tags
+
+  public_ip_prefixes = {
+    "ippre-ldo-uks-prd-001" = { prefix_length = 30, zones = ["1", "2", "3"] }
+  }
+
+  public_ips = {
+    "pip-ldo-uks-prd-001" = { prefix_key = "ippre-ldo-uks-prd-001" } # allocated from the prefix above
+    "pip-ldo-uks-prd-002" = { zones = ["1", "2", "3"] }
+  }
 }
 ```
 
 ## Examples
 
-- [`examples/minimal`](./examples/minimal) - the smallest valid call (required inputs only).
-- [`examples/complete`](./examples/complete) - every supported input exercised.
+- [`examples/minimal`](./examples/minimal) - one Standard static public IP.
+- [`examples/complete`](./examples/complete) - a zone-redundant prefix, an IP allocated from it, and a
+  standalone zonal IP.
 
 ## Developing
 
@@ -107,18 +126,32 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [azurerm_resource_group.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
+| [azurerm_public_ip.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip) | resource |
+| [azurerm_public_ip_prefix.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip_prefix) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_resource_groups"></a> [resource\_groups](#input\_resource\_groups) | List of resource groups to create. | <pre>list(object({<br/>    name     = string<br/>    location = string<br/>    tags     = optional(map(string), {})<br/>  }))</pre> | `[]` | no |
+| <a name="input_location"></a> [location](#input\_location) | Azure region for the public IPs and prefixes. | `string` | n/a | yes |
+| <a name="input_public_ip_prefixes"></a> [public\_ip\_prefixes](#input\_public\_ip\_prefixes) | Public IP prefixes to create, keyed by name. A public IP can draw from one of these in the same<br/>module via its prefix\_key. Defaults to a Standard regional IPv4 /28. | <pre>map(object({<br/>    prefix_length = optional(number, 28)<br/>    sku           = optional(string, "Standard")<br/>    sku_tier      = optional(string, "Regional")<br/>    ip_version    = optional(string, "IPv4")<br/>    zones         = optional(list(string), [])<br/>    tags          = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
+| <a name="input_public_ips"></a> [public\_ips](#input\_public\_ips) | Public IPs to create, keyed by name. Secure defaults: Standard SKU with Static allocation (Basic is<br/>retired and Standard requires Static). Set prefix\_key to allocate from a public\_ip\_prefixes entry in<br/>this module, or public\_ip\_prefix\_id for an external prefix (not both). | <pre>map(object({<br/>    allocation_method       = optional(string, "Static")<br/>    sku                     = optional(string, "Standard")<br/>    sku_tier                = optional(string, "Regional")<br/>    ip_version              = optional(string, "IPv4")<br/>    zones                   = optional(list(string), [])<br/>    idle_timeout_in_minutes = optional(number, 4)<br/>    domain_name_label       = optional(string)<br/>    domain_name_label_scope = optional(string)<br/>    reverse_fqdn            = optional(string)<br/>    prefix_key              = optional(string)<br/>    public_ip_prefix_id     = optional(string)<br/>    ddos_protection_mode    = optional(string, "VirtualNetworkInherited")<br/>    ddos_protection_plan_id = optional(string)<br/>    edge_zone               = optional(string)<br/>    ip_tags                 = optional(map(string), {})<br/>    tags                    = optional(map(string), {})<br/>  }))</pre> | `{}` | no |
+| <a name="input_resource_group_id"></a> [resource\_group\_id](#input\_resource\_group\_id) | Resource id of the resource group to create the public IPs and prefixes in. The name and subscription are parsed from it (pass the rg module's ids output). | `string` | n/a | yes |
+| <a name="input_tags"></a> [tags](#input\_tags) | Tags applied to every public IP and prefix (merged with any per-resource tags). | `map(string)` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| <a name="output_ids"></a> [ids](#output\_ids) | Map of resource group name to its id. |
-| <a name="output_names"></a> [names](#output\_names) | Map of resource group name to its name. |
+| <a name="output_public_ip_addresses"></a> [public\_ip\_addresses](#output\_public\_ip\_addresses) | Map of public IP name to its allocated IP address. |
+| <a name="output_public_ip_fqdns"></a> [public\_ip\_fqdns](#output\_public\_ip\_fqdns) | Map of public IP name to its FQDN (only when domain\_name\_label is set). |
+| <a name="output_public_ip_ids"></a> [public\_ip\_ids](#output\_public\_ip\_ids) | Map of public IP name to its id. |
+| <a name="output_public_ip_ids_zipmap"></a> [public\_ip\_ids\_zipmap](#output\_public\_ip\_ids\_zipmap) | Map of public IP name to a { name, id } object, for handing the whole object downstream. |
+| <a name="output_public_ip_prefix_cidrs"></a> [public\_ip\_prefix\_cidrs](#output\_public\_ip\_prefix\_cidrs) | Map of public IP prefix name to its allocated CIDR (ip\_prefix). |
+| <a name="output_public_ip_prefix_ids"></a> [public\_ip\_prefix\_ids](#output\_public\_ip\_prefix\_ids) | Map of public IP prefix name to its id. |
+| <a name="output_public_ip_prefix_ids_zipmap"></a> [public\_ip\_prefix\_ids\_zipmap](#output\_public\_ip\_prefix\_ids\_zipmap) | Map of public IP prefix name to a { name, id } object. |
+| <a name="output_public_ip_prefixes"></a> [public\_ip\_prefixes](#output\_public\_ip\_prefixes) | The full azurerm\_public\_ip\_prefix resources, keyed by name. |
+| <a name="output_public_ips"></a> [public\_ips](#output\_public\_ips) | The full azurerm\_public\_ip resources, keyed by name. |
+| <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | Resource group name parsed from resource\_group\_id. |
+| <a name="output_subscription_id"></a> [subscription\_id](#output\_subscription\_id) | Subscription id parsed from resource\_group\_id. |
 <!-- END_TF_DOCS -->

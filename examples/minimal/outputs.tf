@@ -1,9 +1,9 @@
-output "ids" {
-  description = "Map of resource group name to id."
-  value       = module.this.ids
+output "public_ip_addresses" {
+  description = "Map of public IP name to its allocated address."
+  value       = module.public_ip.public_ip_addresses
 }
 
-output "names" {
-  description = "Map of resource group name to name."
-  value       = module.this.names
+output "public_ip_ids" {
+  description = "Map of public IP name to id."
+  value       = module.public_ip.public_ip_ids
 }

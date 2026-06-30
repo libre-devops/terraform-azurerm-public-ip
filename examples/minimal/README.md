@@ -26,19 +26,37 @@ applies the stack then always destroys it.
 ```hcl
 locals {
   location = lookup(var.regions, var.loc, "uksouth")
+  rg_name  = "rg-${var.short}-${var.loc}-${terraform.workspace}-001"
 }
 
-# Minimal call: one resource group, required inputs only. The environment comes from the
-# Terraform workspace (terraform.workspace), not a variable.
-module "this" {
+module "tags" {
+  source  = "libre-devops/tags/azurerm"
+  version = "~> 4.0"
+
+  cost_centre     = "1888/67"
+  owner           = "platform@example.com"
+  deployed_branch = var.deployed_branch
+  deployed_repo   = var.deployed_repo
+}
+
+module "rg" {
+  source  = "libre-devops/rg/azurerm"
+  version = "~> 4.0"
+
+  resource_groups = [{ name = local.rg_name, location = local.location, tags = module.tags.tags }]
+}
+
+# Minimal call: a single Standard, static public IP (the secure defaults).
+module "public_ip" {
   source = "../../"
 
-  resource_groups = [
-    {
-      name     = "rg-${var.short}-${var.loc}-${terraform.workspace}-tmpl-min"
-      location = local.location
-    },
-  ]
+  resource_group_id = module.rg.ids[local.rg_name]
+  location          = local.location
+  tags              = module.tags.tags
+
+  public_ips = {
+    "pip-${var.short}-${var.loc}-${terraform.workspace}-001" = {}
+  }
 }
 ```
 
@@ -57,7 +75,9 @@ No providers.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_this"></a> [this](#module\_this) | ../../ | n/a |
+| <a name="module_public_ip"></a> [public\_ip](#module\_public\_ip) | ../../ | n/a |
+| <a name="module_rg"></a> [rg](#module\_rg) | libre-devops/rg/azurerm | ~> 4.0 |
+| <a name="module_tags"></a> [tags](#module\_tags) | libre-devops/tags/azurerm | ~> 4.0 |
 
 ## Resources
 
@@ -67,6 +87,8 @@ No resources.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_deployed_branch"></a> [deployed\_branch](#input\_deployed\_branch) | Git branch the deployment came from. Auto-filled in CI from TF\_VAR\_deployed\_branch. | `string` | `""` | no |
+| <a name="input_deployed_repo"></a> [deployed\_repo](#input\_deployed\_repo) | Repository URL the deployment came from. Auto-filled in CI from TF\_VAR\_deployed\_repo. | `string` | `""` | no |
 | <a name="input_loc"></a> [loc](#input\_loc) | Outfix: short Azure region code used in resource names (for example uks). | `string` | `"uks"` | no |
 | <a name="input_regions"></a> [regions](#input\_regions) | Map of short region codes to Azure region slugs. | `map(string)` | <pre>{<br/>  "eus": "eastus",<br/>  "euw": "westeurope",<br/>  "uks": "uksouth",<br/>  "ukw": "ukwest"<br/>}</pre> | no |
 | <a name="input_short"></a> [short](#input\_short) | Infix: short product code used in resource names. | `string` | `"ldo"` | no |
@@ -75,6 +97,6 @@ No resources.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_ids"></a> [ids](#output\_ids) | Map of resource group name to id. |
-| <a name="output_names"></a> [names](#output\_names) | Map of resource group name to name. |
+| <a name="output_public_ip_addresses"></a> [public\_ip\_addresses](#output\_public\_ip\_addresses) | Map of public IP name to its allocated address. |
+| <a name="output_public_ip_ids"></a> [public\_ip\_ids](#output\_public\_ip\_ids) | Map of public IP name to id. |
 <!-- END_TF_DOCS -->

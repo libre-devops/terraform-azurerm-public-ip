@@ -52,3 +52,8 @@ output "subscription_id" {
   description = "Subscription id parsed from resource_group_id."
   value       = local.rg.subscription_id
 }
+
+output "tags" {
+  description = "The tags applied to the public IPs and prefixes."
+  value       = var.tags
+}

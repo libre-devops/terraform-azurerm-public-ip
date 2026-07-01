@@ -152,4 +152,5 @@ No modules.
 | <a name="output_public_ips"></a> [public\_ips](#output\_public\_ips) | The full azurerm\_public\_ip resources, keyed by name. |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | Resource group name parsed from resource\_group\_id. |
 | <a name="output_subscription_id"></a> [subscription\_id](#output\_subscription\_id) | Subscription id parsed from resource\_group\_id. |
+| <a name="output_tags"></a> [tags](#output\_tags) | The tags applied to the public IPs and prefixes. |
 <!-- END_TF_DOCS -->
